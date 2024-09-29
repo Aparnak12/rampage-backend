@@ -6,7 +6,7 @@ import requests
 import base64
 from google.cloud import vision
 import os
-
+import perplexity_api
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "rampage_sa_key.json"
 
 app = Flask(__name__)
@@ -68,6 +68,7 @@ def get_geopoint_from_address(address):
 def analyze_image(image_data):
     """Analyze image using Google Vision API to extract labels."""
     image = vision.Image(content=image_data)
+
     response = vision_client.label_detection(image=image)
     labels = response.label_annotations
 
@@ -102,6 +103,9 @@ def save_place():
         print("Detected Features:", detected_features)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+    # Perplexity API Prompt - Send Detected Features
+    perplexity_api.prompt_feature_detection(detected_features, selected_features)
 
     # Normalize both selected and detected features for comparison
     selected_features_normalized = [feature.strip().lower() for feature in selected_features]
