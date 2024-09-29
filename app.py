@@ -166,37 +166,67 @@ def get_places():
     try:
         # feature = request.args.get('feature')  # Fetch the feature being queried
         data = request.json
-        requested_features = list(str(data.get('features')).split(','))
-        if not requested_features:
+        requested_features_str = str(data.get('features'))
+        if not requested_features_str.strip():
             return jsonify({"error": "No feature(s) provided"}), 400
+
+        requested_features_arr = [feature.strip() for feature in requested_features_str.split(',')]
+        print("Fetch Places for following features: ", requested_features_arr)
 
         # Query Firestore for places that have the feature in their features string
         places_ref = db.collection('places')
         places = []
 
         query = places_ref #.where('features', '>=', feature).where('features', '<=', feature + '\uf8ff')
-
         results = query.stream()
-
         for place in results:
             place_data = place.to_dict()
-            feature_db = place_data['features']
-            for feature in requested_features:
-                print("feature: " + feature)
-                if feature not in feature_db:
-                    continue
-                # Convert GeoPoint to a dictionary with latitude and longitude
-                location = place_data['location']
-                if isinstance(location, firestore.GeoPoint):
-                    location = {'latitude': location.latitude, 'longitude': location.longitude}
+            feature_db = place_data['features'].split(',')
+            features_present = []
+            for feature in requested_features_arr:
+                if feature in feature_db:
+                    features_present.append(feature)
+            if not features_present:
+                continue
+            print("Feature(s) Found: ", features_present)
+            # Convert GeoPoint to a dictionary with latitude and longitude
+            location = place_data['location']
+            if isinstance(location, firestore.GeoPoint):
+                location = {'latitude': location.latitude, 'longitude': location.longitude}
 
-                places.append({
-                    'name': place_data['name'],
-                    'address': place_data['address'],
-                    'location': location,  # Now it's JSON-serializable
-                    'features': place_data['features']
-                })
-                break
+            places.append({
+                'name': place_data['name'],
+                'address': place_data['address'],
+                'location': location,
+                'features': features_present
+            })
+
+        return jsonify({"status": "success", "data": places}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/all-places', methods=['GET'])
+def get_all_places():
+    try:
+        # Query Firestore for places that have the feature in their features string
+        places_ref = db.collection('places')
+        places = []
+        query = places_ref #.where('features', '>=', feature).where('features', '<=', feature + '\uf8ff')
+        results = query.stream()
+        for place in results:
+            place_data = place.to_dict()
+            feature_db = place_data['features'].split(',')
+            # Convert GeoPoint to a dictionary with latitude and longitude
+            location = place_data['location']
+            if isinstance(location, firestore.GeoPoint):
+                location = {'latitude': location.latitude, 'longitude': location.longitude}
+
+            places.append({
+                'name': place_data['name'],
+                'address': place_data['address'],
+                'location': location,
+                'features': feature_db
+            })
 
         return jsonify({"status": "success", "data": places}), 200
     except Exception as e:
